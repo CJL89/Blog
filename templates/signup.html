@@ -5,24 +5,56 @@
 <h2>Sign Up Page</h2>
 
 <form method='post'>
-    <label>
-        User Name:
-        <input type='text' name='username' value='{{username}}'>
-    </label>
-    <label>
-        Password:
-        <input type='password' name='password' value=''>
-    </label>
-    <label>
-        Verify Password:
-        <input type='password' name='verifypassword' value=''>
-    </label>
-    <label>
-        E-mail Address:
-        <input type='text' name='email' value='{{email}}'>
-    </label>
+    <table>
+        <tr>
+            <td class='label'>
+                User Name:
+            </td>
+            <td>
+                <input type='text' name='username' value='{{username}}'>
+            </td>
+            <td class='error'>
+                {{error_username}}
+            </td>
+        </tr>
 
-    <br>
+        <tr>
+            <td class='label'>
+                Password:
+            </td>
+            <td>
+                <input type='password' name='password' value=''>
+            </td>
+            <td class='error'>
+                {{error_password}}
+            </td>
+        </tr>
+
+        <tr>
+            <td class='label'>
+                Verudy Password:
+            </td>
+            <td>
+                <input type='password' name='password' value=''>
+            </td>
+            <td class='error'>
+                {{error_verifypassword}}
+            </td>
+        </tr>
+
+        <tr>
+            <td class='label'>
+                Email:
+            </td>
+            <td>
+                <input type='text' name='email' value='{{email}}'>
+            </td>
+            <td class='error'>
+                {{error_email}}
+            </td>
+        </tr>
+    </table>
+
     <input type='submit'>
 </form>
 

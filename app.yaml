@@ -1,4 +1,4 @@
-project: udacity-blog-156014
+project: udacity-blog
 runtime: python27
 api_version: 1
 threadsafe: true

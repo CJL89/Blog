@@ -1,4 +1,5 @@
-body{
+body {
+    position: relative;
     font-family: Helvetica, Arial, sans-serif;
     font-size: 14px;
 
@@ -8,56 +9,96 @@ body{
     color: #333;
 }
 
-h2{
+.login-area {
+    font-size: 13px;
+    color: gray;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.login-link {
+    color: gray;
+    text-decoration: none;
+}
+
+.login-link:visited {
+    color: gray;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
+
+h2 {
     font-size: 24px;
     font-weight: bold;
     margin-bottom: 20px;
 }
 
-.error{
+.error {
     color: red;
 }
 
-label{
-    display: block;
-    font-size: 20px;
+label {
+  display: block;
+  font-size: 20px;
 }
 
-label + label{
+label + label {
     margin-top: 20px;
 }
 
-input[type='text']{
+input[type=text] {
     width: 500px;
     font-size: 20px;
     padding: 2px;
-}
-
-textarea{
-    width: 400px;
-    height: 200px;
-    font-size: 17px;
     font-family: monospace;
 }
 
-input[type='submit']{
+textarea {
+  width: 500px;
+  height: 400px;
+  font-size: 17px;
+  font-family: monospace;
+}
+
+input[type=submit] {
+  font-size: 24px;
+}
+
+.main-title {
+    display: block;
+    color: #222;
+    font-size: 40px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 30px;
+    text-decoration: none;
+}
+
+.post + .post {
+    margin-top: 15px;
+}
+
+.post-heading {
+    position: relative;
+    border-bottom: 3px solid #666;
+}
+
+.post-title {
     font-size: 24px;
+    font-weight: bold;
 }
 
-hr{
-    margin: 20px auto;
+.post-date {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    color: #999;
+
 }
 
-.art + .art{
-    margin-top: 20px;
-}
-
-.art-title{
-    margin: 0;
-    font-size: 17px;
-}
-
-.art-body{
-    margin: 0;
-    font-size: 17px;
+.post-content {
+    margin-top: 5px;
 }
