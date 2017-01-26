@@ -84,7 +84,68 @@ class Handler(webapp2.RequestHandler):
 class MainPage(Handler):
 
     def get(self):
-        self.write("Hello World!")
+        self.write('Hello World')
+
+
+def render_post(response, post):
+    response.out.write('<b>' + post.subject + '</b><br>')
+    response.out.write(post.content)
+
+
+def blog_key(name='default'):
+    return db.Key.from_path('blogs', name)
+
+
+class Post(db.Model):
+    subject = db.StringProperty(required=True)
+    content = db.TextProperty(required=True)
+    created = db.DateTimeProperty(auto_now_add=True)
+    last_modified = db.DateTimeProperty(auto_now=True)
+
+    def render(self):
+        self._render_text = self.content.replace('\n', '<br>')
+        return render_str('blog.html', p=self)
+
+
+class BlogMainPage(Handler):
+
+    def get(self):
+        # posts = db.GqlQuery(
+            # 'SELECT * from Post order by created by desc limit 10')
+        posts = Post.all().order('-created')
+        self.render('blog.html', posts=posts)
+
+
+class PostPage(Handler):
+
+    def get(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+
+        if not post:
+            self.error(404)
+            return
+
+        self.render('permalink.html', post=post)
+
+
+class NewPostPage(Handler):
+
+    def get(self):
+        self.render('newpost.html')
+
+    def post(self):
+        subject = self.request.get('subject')
+        content = self.request.get('content')
+
+        if subject and content:
+            p = Post(parent=blog_key(), subject=subject, content=content)
+            p.put()
+            self.redirect('blog/%s' % str(p.key().id()))
+        else:
+            error = "Please add a subject and content, please."
+            self.render('newpost.html', subject=subject,
+                        content=content, error=error)
 
 
 # Verifies for correct characters in the username
@@ -234,15 +295,6 @@ class Register(SignUpHandler):
             self.redirect('/welcome')
 
 
-class WelcomePageHandler(SignUpHandler):
-
-    def get(self):
-        if self.user:
-            self.render('welcome.html', username=self.user.name)
-        else:
-            self.redirect('/signup')
-
-
 # Login class handler
 class LoginHandler(SignUpHandler):
 
@@ -253,13 +305,23 @@ class LoginHandler(SignUpHandler):
         username = self.request.get('username')
         password = self.request.get('password')
 
-        userLogin = User.login(usename, password)
+        userLogin = User.login(username, password)
         if userLogin:
             self.login(userLogin)
-            self.redirect('/blog.html')
+            self.redirect('/welcomepage.html')
         else:
             message = "Invalid login!"
             self.render('login.html', error=message)
+
+
+# Welcome page class that is shown after a user creates a new account or logins
+class WelcomePageHandler(SignUpHandler):
+
+    def get(self):
+        if self.user:
+            self.render('welcome.html', username=self.user.name)
+        else:
+            self.redirect('/signup')
 
 
 # Logout class handler
@@ -267,11 +329,14 @@ class LogoutHandler(SignUpHandler):
 
     def get(self):
         self.logout()
-        self.redirect('/blog.html')
+        self.redirect('/signup')
 
 
 # List of different webpages and connected to their respective classes.
 app = webapp2.WSGIApplication([('/', MainPage),
+                               ('/blog/?', BlogMainPage),
+                               ('/blog/([0-9]+)', PostPage),
+                               ('/blog/newpost', NewPostPage),
                                ('/signup', SignUpHandler),
                                ('/login', LoginHandler),
                                ('/logout', LogoutHandler),
