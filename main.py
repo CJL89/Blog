@@ -22,9 +22,14 @@ jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_dir),
 SECRET = "1234567890"
 
 
-# Creating function to make values secured
+def render_str(template, **params):
+    t = jinja_env.get_template(template)
+    return t.render(params)
+
+
+# Creates the hashlib
 def make_secure_val(val):
-    return "%s|%s" % (val, hmac.new(SECRET, val).hexdigest())
+    return '%s|%s' % (val, hmac.new(SECRET, val).hexdigest())
 
 
 # Creating function to make sure the values are secured
@@ -32,11 +37,6 @@ def check_secure_val(secure_val):
     val = secure_val.split('|')[0]
     if secure_val == make_secure_val(val):
         return val
-
-
-# Creating function that makes randomiser of letters
-def make_salt(length=5):
-    return ''.join(random.choice(letters) for x in xrange(length))
 
 
 # Creating class that render jinja and short hands some responses
@@ -49,8 +49,7 @@ class Handler(webapp2.RequestHandler):
     # Render jinja and params for user
     def render_str(self, template, **params):
         params['user'] = self.user
-        t = jinja_env.get_template(template)
-        return t.render(params)
+        return render_str(template, **params)
 
     def render(self, template, **kw):
         self.write(self.render_str(template, **kw))
@@ -80,16 +79,69 @@ class Handler(webapp2.RequestHandler):
         self.user = uid and User.by_id(int(uid))
 
 
+def render_post(response, post):
+    response.out.write('<b>' + post.subject + '</b><br>')
+    response.out.write(post.content)
+
+
 # MainPage class
 class MainPage(Handler):
 
     def get(self):
-        self.write('Hello World')
+        self.redirect('/blog')
 
 
-def render_post(response, post):
-    response.out.write('<b>' + post.subject + '</b><br>')
-    response.out.write(post.content)
+# Creates a random letters in order to strengthen the hash
+def make_salt(length=5):
+    return ''.join(random.choice(letters) for x in xrange(length))
+
+
+# Creates the hash and incorporates the salt
+def make_pw_hash(name, pw, salt=None):
+    if not salt:
+        salt = make_salt()
+    h = hashlib.sha256(name + pw + salt).hexdigest()
+    return '%s,%s' % (salt, h)
+
+
+def valid_pw(name, password, h):
+    salt = h.split(',')[0]
+    return h == make_pw_hash(name, password, salt)
+
+
+def users_key(group='default'):
+    return db.Key.from_path('users', group)
+
+
+# Creating class for the user
+class User(db.Model):
+    name = db.StringProperty(required=True)
+    pw_hash = db.StringProperty(required=True)
+    email = db.StringProperty()
+
+    # Decorator
+    @classmethod
+    def by_id(cls, uid):
+        return User.get_by_id(uid, parent=users_key())
+
+    @classmethod
+    def by_name(cls, name):
+        u = User.all().filter('name =', name).get()
+        return u
+
+    @classmethod
+    def register(cls, name, pw, email=None):
+        pw_hash = make_pw_hash(name, pw)
+        return User(parent=users_key(),
+                    name=name,
+                    pw_hash=pw_hash,
+                    email=email)
+
+    @classmethod
+    def login(cls, name, pw):
+        u = cls.by_name(name)
+        if u and valid_pw(name, pw, u.pw_hash):
+            return u
 
 
 def blog_key(name='default'):
@@ -104,12 +156,13 @@ class Post(db.Model):
 
     def render(self):
         self._render_text = self.content.replace('\n', '<br>')
-        return render_str('blog.html', p=self)
+        return render_str('post.html', p=self)
 
 
 class BlogMainPage(Handler):
 
     def get(self):
+        # GQL way:
         # posts = db.GqlQuery(
             # 'SELECT * from Post order by created by desc limit 10')
         posts = Post.all().order('-created')
@@ -132,9 +185,15 @@ class PostPage(Handler):
 class NewPostPage(Handler):
 
     def get(self):
-        self.render('newpost.html')
+        if self.user:
+            self.render("newpost.html")
+        else:
+            self.redirect("/login")
 
     def post(self):
+        if not self.user:
+            self.redirect('/blog')
+
         subject = self.request.get('subject')
         content = self.request.get('content')
 
@@ -219,66 +278,6 @@ class SignUpHandler(Handler):
         raise NotImplementedError
 
 
-# Creates a random letters in order to strengthen the hash
-def make_salt(length=5):
-    return ''.join(random.choice(letters) for x in xrange(length))
-
-
-# Creates the hash and incorporates the salt
-def make_pw_hash(name, pw, salt=None):
-    if not salt:
-        salt = make_salt()
-    h = hashlib.sha256(name + pw + salt).hexdigest()
-    return '%s,%s' % (salt, h)
-
-
-def valid_pw(name, password, h):
-    salt = h.split(',')[0]
-    return h == make_pw_hash(name, password, salt)
-
-
-def users_key(group='default'):
-    return db.Key.from_path('users', group)
-
-
-# Creating class for the user
-class User(db.Model):
-    name = db.StringProperty(required=True)
-    pw_hash = db.StringProperty(required=True)
-    email = db.StringProperty()
-
-    # Decorator
-    @classmethod
-    def by_id(cls, uid):
-        return User.get_by_id(uid, parent=users_key())
-
-    @classmethod
-    def by_name(cls, name):
-        u = User.all().filter('name =', name).get()
-        return u
-
-    @classmethod
-    def register(cls, name, pw, email=None):
-        pw_hash = make_pw_hash(name, pw)
-        return User(parent=users_key(),
-                    name=name,
-                    pw_hash=pw_hash,
-                    email=email)
-
-    @classmethod
-    def login(cls, name, pw):
-        u = cls.by_name(name)
-        if u and valid_pw(name, pw, u.pw_hash):
-            return u
-
-
-# Class that redirects the user after the successfully completed signup page
-class Signup(SignUpHandler):
-
-    def done(self):
-        self.redirect('/welcomepage?username=', self.username)
-
-
 # Register class handler
 class Register(SignUpHandler):
 
@@ -296,7 +295,7 @@ class Register(SignUpHandler):
 
 
 # Login class handler
-class LoginHandler(SignUpHandler):
+class LoginHandler(Handler):
 
     def get(self):
         self.render('login.html')
@@ -315,17 +314,17 @@ class LoginHandler(SignUpHandler):
 
 
 # Welcome page class that is shown after a user creates a new account or logins
-class WelcomePageHandler(SignUpHandler):
+class WelcomePageHandler(Handler):
 
     def get(self):
         if self.user:
-            self.render('welcome.html', username=self.user.name)
+            self.render('welcomepage.html', username=self.user.name)
         else:
             self.redirect('/signup')
 
 
 # Logout class handler
-class LogoutHandler(SignUpHandler):
+class LogoutHandler(Handler):
 
     def get(self):
         self.logout()
