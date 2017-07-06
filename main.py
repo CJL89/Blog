@@ -6,6 +6,7 @@ import re
 import random
 import hashlib
 import hmac
+import time
 
 from google.appengine.ext import db
 from string import letters
@@ -83,7 +84,8 @@ def render_post(response, post):
 class MainPage(Handler):
 
     def get(self):
-        self.redirect('/blog')
+        posts = Post.query().order(Post.created)
+        self.render('front.html', posts=posts)
 
 
 def make_salt(length=5):
@@ -132,6 +134,10 @@ def valid_email(email):
     return not email or EMAIL_RE.match(email)
 
 
+def users_key(group='default'):
+    return db.Key('users', group)
+
+
 # Class that sets the variables needed for users
 class User(db.Model):
     name = db.StringProperty(required=True)
@@ -162,16 +168,40 @@ class User(db.Model):
             return u
 
 
+def blog_key(name='default'):
+    return db.Key('blogs', name)
+
+
 # Class that sets the different variables for the posts
 class Post(db.Model):
     subject = db.StringProperty(required=True)
     content = db.TextProperty(required=True)
     created = db.DateTimeProperty(auto_now_add=True)
     last_modified = db.DateTimeProperty(auto_now=True)
+    author = db.KeyProperty(kind='user')
 
     def render(self):
-        self._render_text = self.content.replace('\n', '<br>')
-        return render_str("post.html", p=self)
+        self._render.text = self.content.replace('\n', '<br>')
+        return main.render_str('post.html', p=self)
+
+    def comments(self):
+        comments = Comment.query().filter(Comment.post == self.key)
+        return comments
+
+
+# Comment class, where other users can write underneath other posts.
+class Comment(db.Model):
+    post = db.StringProperty(kind='post')
+    content = db.StringProperty(required=True)
+    created = db.DateTimeProperty(auto_now_add=True)
+    author = db.KeyProperty(kind='user')
+
+
+# Like class, keeps track of how many people like a specific post.
+class Likes(db.Model):
+    author = db.KeyProperty(kind='user')
+    post = db.StringProperty(kind='post')
+    like_counter = db.IntegerProperty()
 
 
 # Class that calls the main blog link
@@ -188,27 +218,42 @@ class PostPage(Handler):
     def get(self, post_id):
         key = db.Key.from_path('Post', int(post_id), parent=blog_key())
         post = db.get(key)
+        like_obj = Like.query(Like.post == post.key)
 
         if not post:
             self.error(404)
             return
-
         self.render("permalink.html", post=post)
+
+    def post(self, post_id):
+        key = db.Key.from_path('Post', int(post_id), parent=blog_key())
+        post = db.get(key)
+
+        if not post:
+            self.error(404)
+            return
 
 
 # Class that handles new posts created by the user
 class NewPost(Handler):
 
     def get(self):
-        self.render("newpost.html")
+        if self.user:
+            self.render("newpost.html")
+        else:
+            self.render('/login')
 
     def post(self):
+        if not self.user:
+            return self.redirect('/login')
+
         subject = self.request.get('subject')
         content = self.request.get('content')
 
         if subject and content:
             p = Post(parent=blog_key(), subject=subject, content=content)
             p.put()
+            self.redirect('/')
             self.redirect('/blog/%s' % str(p.key().id()))
         else:
             error = "Please add a subject and content!"
@@ -216,6 +261,7 @@ class NewPost(Handler):
                         content=content, error=error)
 
 
+# Class for new user sign up handler.
 class Signup(Handler):
 
     def get(self):
@@ -228,8 +274,7 @@ class Signup(Handler):
         self.verify = self.request.get('verify')
         self.email = self.request.get('email')
 
-        params = dict(username=self.username,
-                      email=self.email)
+        params = dict(username=self.username, email=self.email)
 
         if not valid_username(self.username):
             params['error_username'] = "That is not a valid username."
@@ -252,23 +297,16 @@ class Signup(Handler):
             self.done()
 
     def done(self, *a, **kw):
-        raise NotImplementedError
-
-
-class Register(Signup):
-
-    def done(self):
-        # Make sure the user doesn't already exist
         u = User.by_name(self.username)
         if u:
-            msg = 'That user already exists.'
+            msg = 'User already exits!'
             self.render('signup.html', error_username=msg)
         else:
             u = User.register(self.username, self.password, self.email)
-            u.put()
-
-            self.login(u)
-            self.redirect('/blog')
+            key = u.put()
+            usercookie = make_secure_val(str(self.username))
+            self.response.headers.add_header(
+                'Set-Cookie', 'u=%s, Path=/' % usercookie)
 
 
 class Login(Handler):
@@ -281,9 +319,13 @@ class Login(Handler):
         password = self.request.get('password')
 
         u = User.login(username, password)
+
         if u:
+            usercookie = make_secure_val(str(username))
+            self.response.headers.add_header(
+                'Set-Cookie', 'u=%s, Path=/' % usercookie)
             self.login(u)
-            self.redirect('/blog')
+            self.redirect('/')
         else:
             msg = 'Invalid login'
             self.render('login.html', error=msg)
@@ -293,10 +335,10 @@ class Logout(Handler):
 
     def get(self):
         self.logout()
-        self.redirect('/blog')
+        self.redirect('/')
 
 
-class Unit3Welcome(Handler):
+class Welcome(Handler):
 
     def get(self):
         if self.user:
@@ -311,8 +353,8 @@ app = webapp2.WSGIApplication([('/', MainPage),
                                ('/blog/?', BlogFront),
                                ('/blog/([0-9]+)', PostPage),
                                ('/blog/newpost', NewPost),
+                               ('/blog/welcome', Welcome),
                                ('/signup', Register),
                                ('/login', Login),
-                               ('/logout', Logout),
-                               ('/unit3/welcome', Unit3Welcome)],
+                               ('/logout', Logout)],
                               debug=True)

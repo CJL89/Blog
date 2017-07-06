@@ -5,32 +5,21 @@
 <h2>Login Page</h2>
 
 <form method='post'>
-    <table>
-        <tr>
-            <td class='label'>
-                User Name:
-            </td>
-            <td>
-                <input type='text' name='username' value='{{username}}'>
-            </td>
-        </tr>
+    <div class='container'>
+        <label>Username:</label>
+            <input type='text' name='username' value='{{username}}'>
 
-        <tr>
-            <td class='label'>
-                Password:
-            </td>
-            <td>
+        <label>Password:</label>
                 <input type='password' name='password' value=''>
-            </td>
-        </tr>
 
-    </table>
-    
-    <div class='error'>
-        {{error}}
+        <div class='error'>
+            {{error}}
+        </div>
+
+        <div class='clearfix'>
+            <input type='submit'>
+        </div>
     </div>
-
-    <input type='submit'>
 </form>
 
 {% endblock %}
